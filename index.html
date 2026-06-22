@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medication Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <h1 class="brand">Medication Log</h1>
+      <div class="menu-wrap">
+        <button
+          class="menu-button"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-menu"
+          aria-label="メニューを開く"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <nav class="menu-panel" id="site-menu" hidden>
+          <a href="manage.html">くすりを管理</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="hero-card">
+        <p class="eyebrow">Daily Tracking</p>
+        <h2>飲んだタイミングを簡単に記録</h2>
+        <p class="intro">
+          毎日の服薬を見落とさないための、シンプルな記録画面です。
+        </p>
+        <button class="primary-action" type="button">記録をはじめる</button>
+      </section>
+
+      <section class="log-preview">
+        <div class="log-header">
+          <h3>今日の記録</h3>
+          <span>6月22日</span>
+        </div>
+        <ul>
+          <li>
+            <strong>朝の薬</strong>
+            <span>08:00</span>
+          </li>
+          <li>
+            <strong>昼の薬</strong>
+            <span>12:30</span>
+          </li>
+          <li>
+            <strong>夜の薬</strong>
+            <span>20:00</span>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

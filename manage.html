@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>くすりを管理 | Medication Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <h1 class="brand">Medication Log</h1>
+      <div class="menu-wrap">
+        <button
+          class="menu-button"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-menu"
+          aria-label="メニューを開く"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <nav class="menu-panel" id="site-menu" hidden>
+          <a href="index.html">ホームに戻る</a>
+          <a href="manage.html" aria-current="page">くすりを管理</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="hero-card secondary">
+        <p class="eyebrow">Manage Medication</p>
+        <h2>くすりを管理</h2>
+        <p class="intro">
+          飲む薬の名前や回数、時間帯を見直せるページです。
+        </p>
+      </section>
+
+      <section class="medicine-list">
+        <article>
+          <div>
+            <h3>アレルギー薬</h3>
+            <p>1日2回 / 朝・夜</p>
+          </div>
+          <button type="button">編集</button>
+        </article>
+        <article>
+          <div>
+            <h3>ビタミン剤</h3>
+            <p>1日1回 / 昼</p>
+          </div>
+          <button type="button">編集</button>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
