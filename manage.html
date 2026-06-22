@@ -25,7 +25,7 @@
           <span></span>
           <span></span>
         </button>
-        <nav class="menu-panel" id="site-menu" hidden>
+        <nav class="menu-panel" id="site-menu">
           <a href="index.html">ホームに戻る</a>
           <a href="manage.html" aria-current="page">くすりを管理</a>
         </nav>
@@ -33,33 +33,37 @@
     </header>
 
     <main class="content">
-      <section class="hero-card secondary">
-        <p class="eyebrow">Manage Medication</p>
-        <h2>くすりを管理</h2>
-        <p class="intro">
-          飲む薬の名前や回数、時間帯を見直せるページです。
-        </p>
-      </section>
+      <section class="manage-panel">
 
-      <section class="medicine-list">
-        <article>
-          <div>
-            <h3>アレルギー薬</h3>
-            <p>1日2回 / 朝・夜</p>
+        <form class="medicine-form" data-medicine-form>
+          <label class="input-label" for="medicine-name">Name</label>
+          <div class="form-row">
+            <input
+              id="medicine-name"
+              name="name"
+              type="text"
+              autocomplete="off"
+              placeholder="薬の名前を入力"
+              required
+            >
+            <button class="add-button" type="submit">Add</button>
           </div>
-          <button type="button">編集</button>
-        </article>
-        <article>
-          <div>
-            <h3>ビタミン剤</h3>
-            <p>1日1回 / 昼</p>
+        </form>
+
+        <p class="status-message" data-status-message aria-live="polite"></p>
+
+        <section class="medicine-list" aria-labelledby="medicine-list-title">
+          <div class="list-header">
+            <h3 id="medicine-list-title">くすり一覧</h3>
           </div>
-          <button type="button">編集</button>
-        </article>
+          <div class="medicine-feed" data-medicine-list></div>
+        </section>
       </section>
     </main>
   </div>
 
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>

@@ -25,45 +25,22 @@
           <span></span>
           <span></span>
         </button>
-        <nav class="menu-panel" id="site-menu" hidden>
+        <nav class="menu-panel" id="site-menu">
           <a href="manage.html">くすりを管理</a>
         </nav>
       </div>
     </header>
 
     <main class="content">
-      <section class="hero-card">
-        <p class="eyebrow">Daily Tracking</p>
-        <h2>飲んだタイミングを簡単に記録</h2>
-        <p class="intro">
-          毎日の服薬を見落とさないための、シンプルな記録画面です。
-        </p>
-        <button class="primary-action" type="button">記録をはじめる</button>
-      </section>
-
-      <section class="log-preview">
-        <div class="log-header">
-          <h3>今日の記録</h3>
-          <span>6月22日</span>
-        </div>
-        <ul>
-          <li>
-            <strong>朝の薬</strong>
-            <span>08:00</span>
-          </li>
-          <li>
-            <strong>昼の薬</strong>
-            <span>12:30</span>
-          </li>
-          <li>
-            <strong>夜の薬</strong>
-            <span>20:00</span>
-          </li>
-        </ul>
+      <section class="medicine-actions">
+        <p class="status-message" data-home-status-message aria-live="polite"></p>
+        <div class="medicine-button-list" data-home-medicine-list></div>
       </section>
     </main>
   </div>
 
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>

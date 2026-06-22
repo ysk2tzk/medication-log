@@ -1,17 +1,319 @@
 const menuButton = document.querySelector(".menu-button");
 const menuPanel = document.querySelector(".menu-panel");
+const VALID_COLUMN_CANDIDATES = ["isValid", "is_valid"];
 
 if (menuButton && menuPanel) {
-  menuButton.addEventListener("click", () => {
+  const closeMenu = () => {
+    menuButton.setAttribute("aria-expanded", "false");
+    menuPanel.classList.remove("is-open");
+  };
+
+  const toggleMenu = () => {
     const isExpanded = menuButton.getAttribute("aria-expanded") === "true";
     menuButton.setAttribute("aria-expanded", String(!isExpanded));
-    menuPanel.hidden = isExpanded;
+    menuPanel.classList.toggle("is-open", !isExpanded);
+  };
+
+  closeMenu();
+
+  menuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleMenu();
   });
 
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".menu-wrap")) {
-      menuButton.setAttribute("aria-expanded", "false");
-      menuPanel.hidden = true;
+      closeMenu();
     }
   });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeMenu();
+    }
+  });
+}
+
+const medicineForm = document.querySelector("[data-medicine-form]");
+const medicineList = document.querySelector("[data-medicine-list]");
+const statusMessage = document.querySelector("[data-status-message]");
+const homeMedicineList = document.querySelector("[data-home-medicine-list]");
+const homeStatusMessage = document.querySelector("[data-home-status-message]");
+
+const supabaseUrl = window.MEDICATION_LOG_SUPABASE_URL;
+const supabaseAnonKey = window.MEDICATION_LOG_SUPABASE_ANON_KEY;
+const createClient = window.supabase?.createClient;
+
+const getValidColumnName = (medicine = {}) =>
+  VALID_COLUMN_CANDIDATES.find((columnName) =>
+    Object.prototype.hasOwnProperty.call(medicine, columnName)
+  ) ?? "isValid";
+
+const getValidValue = (medicine = {}) => Boolean(medicine[getValidColumnName(medicine)]);
+
+const createSupabaseClient = () => {
+  if (typeof createClient !== "function" || !supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+if (homeMedicineList && homeStatusMessage) {
+  const supabaseClient = createSupabaseClient();
+
+  const setHomeStatus = (message, type = "") => {
+    homeStatusMessage.textContent = message;
+    homeStatusMessage.className = "status-message";
+
+    if (type) {
+      homeStatusMessage.classList.add(`is-${type}`);
+    }
+  };
+
+  const renderHomeEmptyState = (message) => {
+    homeMedicineList.innerHTML = `<p class="empty-message">${message}</p>`;
+  };
+
+  if (!supabaseClient) {
+    renderHomeEmptyState("medicineはまだ表示できません。");
+    setHomeStatus("config.js に Supabase URL と anon key を設定してください。", "error");
+  } else {
+    const loadHomeMedicines = async () => {
+      setHomeStatus("medicine を読み込み中です。");
+
+      const { data, error } = await supabaseClient
+        .from("medicine")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (error) {
+        renderHomeEmptyState("medicineを読み込めませんでした。");
+        setHomeStatus(`一覧取得に失敗しました: ${error.message}`, "error");
+        return;
+      }
+
+      const validMedicines = (data ?? []).filter((medicine) => getValidValue(medicine));
+
+      if (!validMedicines.length) {
+        renderHomeEmptyState("isValid=true の medicine はありません。");
+        setHomeStatus("表示対象の medicine が0件です。", "error");
+        return;
+      }
+
+      homeMedicineList.innerHTML = "";
+
+      validMedicines.forEach((medicine) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "medicine-action-button";
+        button.textContent = medicine.name;
+        button.addEventListener("click", () => {
+          const shouldRecord = window.confirm(
+            `${medicine.name}の服薬を記録します。よろしいですか？`
+          );
+
+          if (!shouldRecord) {
+            return;
+          }
+        });
+        homeMedicineList.append(button);
+      });
+      setHomeStatus("");
+    };
+
+    loadHomeMedicines();
+  }
+}
+
+if (medicineForm && medicineList && statusMessage) {
+  const nameInput = medicineForm.elements.namedItem("name");
+
+  const setStatus = (message, type = "") => {
+    statusMessage.textContent = message;
+    statusMessage.className = "status-message";
+
+    if (type) {
+      statusMessage.classList.add(`is-${type}`);
+    }
+  };
+
+  const setFormDisabled = (disabled) => {
+    medicineForm.querySelectorAll("input, button").forEach((element) => {
+      element.disabled = disabled;
+    });
+  };
+
+  const renderEmptyState = (message) => {
+    medicineList.innerHTML = `<p class="empty-message">${message}</p>`;
+  };
+
+  if (
+    !(nameInput instanceof HTMLInputElement) ||
+    !createSupabaseClient()
+  ) {
+    setFormDisabled(true);
+    renderEmptyState("medicineはまだ表示できません。");
+    setStatus("config.js に Supabase URL と anon key を設定してください。", "error");
+  } else {
+    const supabaseClient = createSupabaseClient();
+
+    const insertMedicine = async (name) => {
+      const insertPayloads = [
+        { name, isValid: true },
+        { name, is_valid: true },
+      ];
+
+      for (const payload of insertPayloads) {
+        const result = await supabaseClient
+          .from("medicine")
+          .insert([payload])
+          .select();
+
+        if (!result.error) {
+          return result;
+        }
+
+        const message = result.error.message ?? "";
+        const isMissingColumnError =
+          message.includes("Could not find the") ||
+          message.includes("column") ||
+          message.includes("schema cache");
+
+        if (!isMissingColumnError) {
+          return result;
+        }
+      }
+
+      return {
+        data: null,
+        error: new Error("medicine の登録に使用できる有効フラグ列が見つかりませんでした。"),
+      };
+    };
+
+    const renderMedicines = (medicines) => {
+      if (!medicines.length) {
+        renderEmptyState("medicineはまだ登録されていません。");
+        return;
+      }
+
+      medicineList.innerHTML = "";
+
+      medicines.forEach((medicine) => {
+        const item = document.createElement("article");
+        item.className = "medicine-item";
+
+        const name = document.createElement("p");
+        name.className = "medicine-name";
+        name.textContent = medicine.name;
+
+        const toggleLabel = document.createElement("label");
+        toggleLabel.className = "switch";
+
+        const toggle = document.createElement("input");
+        toggle.type = "checkbox";
+        toggle.checked = getValidValue(medicine);
+        toggle.setAttribute("aria-label", `${medicine.name} の有効状態`);
+
+        const slider = document.createElement("span");
+        slider.className = "switch-slider";
+
+        toggle.addEventListener("change", async () => {
+          const nextValue = toggle.checked;
+          const validColumnName = getValidColumnName(medicine);
+          toggle.disabled = true;
+
+          const { error } = await supabaseClient
+            .from("medicine")
+            .update({ [validColumnName]: nextValue })
+            .eq("id", medicine.id);
+
+          toggle.disabled = false;
+
+          if (error) {
+            toggle.checked = !nextValue;
+            setStatus(`更新に失敗しました: ${error.message}`, "error");
+            return;
+          }
+
+          setStatus("isValid を更新しました。", "success");
+        });
+
+        toggleLabel.append(toggle, slider);
+        item.append(name, toggleLabel);
+        medicineList.append(item);
+      });
+    };
+
+    const loadMedicines = async () => {
+      setStatus("medicine を読み込み中です。");
+
+      const { data, error } = await supabaseClient
+        .from("medicine")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (error) {
+        renderEmptyState("medicineを読み込めませんでした。");
+        setStatus(`一覧取得に失敗しました: ${error.message}`, "error");
+        return;
+      }
+
+      renderMedicines(data ?? []);
+      if ((data ?? []).length === 0) {
+        setStatus(
+          "一覧が0件です。insert が成功している場合は Supabase の SELECT policy / RLS を確認してください。",
+          "error"
+        );
+        return;
+      }
+
+      setStatus(`${data.length}件の medicine を表示しています。`, "success");
+    };
+
+    medicineForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const name = nameInput.value.trim();
+
+      if (!name) {
+        setStatus("Name を入力してください。", "error");
+        nameInput.focus();
+        return;
+      }
+
+      const shouldInsert = window.confirm(`${name}を登録します。よろしいですか？`);
+
+      if (!shouldInsert) {
+        setStatus("登録をキャンセルしました。");
+        return;
+      }
+
+      setFormDisabled(true);
+      setStatus("medicine を追加中です。");
+
+      const { data, error } = await insertMedicine(name);
+
+      setFormDisabled(false);
+
+      if (error) {
+        setStatus(`追加に失敗しました: ${error.message}`, "error");
+        return;
+      }
+
+      medicineForm.reset();
+      nameInput.focus();
+      if ((data ?? []).length === 0) {
+        setStatus(
+          "追加は成功しましたが、返却データがありません。RLS の設定を確認してください。",
+          "error"
+        );
+      } else {
+        setStatus("medicine を追加しました。", "success");
+      }
+      await loadMedicines();
+    });
+
+    loadMedicines();
+  }
 }

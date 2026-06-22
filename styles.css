@@ -95,13 +95,17 @@ button {
   top: calc(100% + 10px);
   right: 0;
   width: 180px;
-  display: grid;
+  display: none;
   gap: 6px;
   padding: 10px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--shadow);
+}
+
+.menu-panel.is-open {
+  display: grid;
 }
 
 .menu-panel a {
@@ -236,6 +240,192 @@ button {
 
 .medicine-list button {
   padding: 10px 16px;
+}
+
+.manage-panel,
+.medicine-list,
+.medicine-item,
+.medicine-actions {
+  background: var(--panel);
+  border: 1px solid rgba(215, 208, 195, 0.85);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.medicine-actions {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+}
+
+.medicine-button-list {
+  display: grid;
+  gap: 12px;
+}
+
+.medicine-action-button {
+  width: 100%;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  text-align: left;
+}
+
+.manage-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.section-heading h2,
+.list-header h3 {
+  margin: 0;
+}
+
+.medicine-form {
+  display: grid;
+  gap: 10px;
+}
+
+.input-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.form-row {
+  display: grid;
+  gap: 10px;
+}
+
+.form-row input {
+  min-width: 0;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+}
+
+.add-button {
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.status-message {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.status-message.is-error {
+  color: #a23b31;
+}
+
+.status-message.is-success {
+  color: var(--accent);
+}
+
+.medicine-list {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.medicine-feed {
+  display: grid;
+  gap: 12px;
+}
+
+.medicine-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.medicine-name,
+.empty-message {
+  margin: 0;
+}
+
+.medicine-name {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.empty-message {
+  color: var(--muted);
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 52px;
+  height: 32px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.switch-slider {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #d3d8d3;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(31, 37, 32, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.switch input:checked + .switch-slider {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-slider::after {
+  transform: translateX(20px);
+}
+
+.switch input:disabled + .switch-slider {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 @media (min-width: 768px) {
