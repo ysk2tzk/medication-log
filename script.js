@@ -42,7 +42,14 @@ const homeStatusMessage = document.querySelector("[data-home-status-message]");
 
 const supabaseUrl = window.MEDICATION_LOG_SUPABASE_URL;
 const supabaseAnonKey = window.MEDICATION_LOG_SUPABASE_ANON_KEY;
+const googleClientId = window.MEDICATION_LOG_GOOGLE_CLIENT_ID;
+const googleAccountEmail = window.MEDICATION_LOG_GOOGLE_ACCOUNT_EMAIL;
+const googleCalendarId = window.MEDICATION_LOG_GOOGLE_CALENDAR_ID;
 const createClient = window.supabase?.createClient;
+const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+
+let googleAccessToken = "";
+let googleTokenClient = null;
 
 const getValidColumnName = (medicine = {}) =>
   VALID_COLUMN_CANDIDATES.find((columnName) =>
@@ -57,6 +64,169 @@ const createSupabaseClient = () => {
   }
 
   return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+const formatConfirmationDateTime = (value = new Date()) =>
+  new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(value);
+
+const hasGoogleCalendarConfig = () =>
+  Boolean(googleClientId && googleAccountEmail && googleCalendarId);
+
+const createMedicationLogRecord = async (
+  supabaseClient,
+  medicationId,
+  googleCalendarEventId,
+  recordedAt
+) => {
+  const { error } = await supabaseClient
+    .from("medication_log")
+    .insert([{
+      medicine_id: medicationId,
+      google_calendar_event_id: googleCalendarEventId,
+      created_at: recordedAt,
+    }]);
+
+  return { error };
+};
+
+const getGoogleTokenClient = () => {
+  if (googleTokenClient || !window.google?.accounts?.oauth2 || !googleClientId) {
+    return googleTokenClient;
+  }
+
+  googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: googleClientId,
+    scope: GOOGLE_CALENDAR_SCOPE,
+    callback: () => {},
+  });
+
+  return googleTokenClient;
+};
+
+const requestGoogleAccessToken = () =>
+  new Promise((resolve, reject) => {
+    if (!hasGoogleCalendarConfig()) {
+      reject(new Error("config.js に Google カレンダー連携設定を追加してください。"));
+      return;
+    }
+
+    const tokenClient = getGoogleTokenClient();
+
+    if (!tokenClient) {
+      reject(new Error("Google 認証ライブラリの読み込みに失敗しました。"));
+      return;
+    }
+
+    tokenClient.callback = (response) => {
+      if (response.error) {
+        reject(new Error(response.error));
+        return;
+      }
+
+      googleAccessToken = response.access_token ?? "";
+      resolve(googleAccessToken);
+    };
+
+    tokenClient.requestAccessToken({
+      prompt: googleAccessToken ? "" : "consent",
+      login_hint: googleAccountEmail,
+    });
+  });
+
+const formatCalendarDateTime = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toISOString();
+};
+
+const createGoogleCalendarEvent = async (medicineName, createdAt) => {
+  const accessToken = googleAccessToken || await requestGoogleAccessToken();
+  const startAt = new Date(createdAt);
+
+  if (Number.isNaN(startAt.getTime())) {
+    throw new Error("medication_log.created_at を日時として解釈できませんでした。");
+  }
+
+  const endAt = new Date(startAt.getTime() + 30 * 60 * 1000);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(googleCalendarId)}/events`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: `☑️${medicineName}`,
+        start: {
+          dateTime: formatCalendarDateTime(startAt),
+          timeZone,
+        },
+        end: {
+          dateTime: formatCalendarDateTime(endAt),
+          timeZone,
+        },
+      }),
+    }
+  );
+
+  if (response.status === 401 && googleAccessToken) {
+    googleAccessToken = "";
+    return createGoogleCalendarEvent(medicineName, createdAt);
+  }
+
+  if (!response.ok) {
+    let errorMessage = "Google カレンダーへの登録に失敗しました。";
+
+    try {
+      const errorPayload = await response.json();
+      errorMessage = errorPayload.error?.message || errorMessage;
+    } catch {
+      // Ignore JSON parse failure and keep the default message.
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+};
+
+const deleteGoogleCalendarEvent = async (eventId) => {
+  const accessToken = googleAccessToken || await requestGoogleAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(googleCalendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (response.status === 401 && googleAccessToken) {
+    googleAccessToken = "";
+    return deleteGoogleCalendarEvent(eventId);
+  }
+
+  if (!response.ok) {
+    let errorMessage = "Google カレンダーイベントの削除に失敗しました。";
+
+    try {
+      const errorPayload = await response.json();
+      errorMessage = errorPayload.error?.message || errorMessage;
+    } catch {
+      // Ignore JSON parse failure and keep the default message.
+    }
+
+    throw new Error(errorMessage);
+  }
 };
 
 if (homeMedicineList && homeStatusMessage) {
@@ -108,14 +278,70 @@ if (homeMedicineList && homeStatusMessage) {
         button.type = "button";
         button.className = "medicine-action-button";
         button.textContent = medicine.name;
-        button.addEventListener("click", () => {
+        button.addEventListener("click", async () => {
+          const recordedAt = new Date();
+          const confirmationDateTime = formatConfirmationDateTime(recordedAt);
           const shouldRecord = window.confirm(
-            `${medicine.name}の服薬を記録します。よろしいですか？`
+            `${medicine.name}の服薬を${confirmationDateTime}に記録します。よろしいですか？`
           );
 
           if (!shouldRecord) {
             return;
           }
+
+          button.disabled = true;
+          setHomeStatus("Google カレンダーへ登録中です。");
+
+          let googleCalendarEvent;
+
+          try {
+            googleCalendarEvent = await createGoogleCalendarEvent(
+              medicine.name,
+              recordedAt.toISOString()
+            );
+          } catch (calendarError) {
+            button.disabled = false;
+            setHomeStatus(`Google カレンダー登録に失敗しました: ${calendarError.message}`, "error");
+            return;
+          }
+
+          if (!googleCalendarEvent?.id) {
+            button.disabled = false;
+            setHomeStatus("Google カレンダーイベント ID を取得できませんでした。", "error");
+            return;
+          }
+
+          setHomeStatus("服薬記録を保存中です。");
+
+          const { error } = await createMedicationLogRecord(
+            supabaseClient,
+            medicine.id,
+            googleCalendarEvent.id,
+            recordedAt.toISOString()
+          );
+
+          if (error) {
+            try {
+              await deleteGoogleCalendarEvent(googleCalendarEvent.id);
+            } catch (deleteError) {
+              button.disabled = false;
+              setHomeStatus(
+                `服薬記録の保存に失敗し、Google カレンダーイベント削除にも失敗しました: ${deleteError.message}`,
+                "error"
+              );
+              return;
+            }
+
+            button.disabled = false;
+            setHomeStatus(
+              `服薬記録の保存に失敗したため、Google カレンダーイベントを取り消しました: ${error.message}`,
+              "error"
+            );
+            return;
+          }
+
+          button.disabled = false;
+          setHomeStatus(`${medicine.name}の服薬を記録しました。`, "success");
         });
         homeMedicineList.append(button);
       });
@@ -236,7 +462,10 @@ if (medicineForm && medicineList && statusMessage) {
             return;
           }
 
-          setStatus("isValid を更新しました。", "success");
+          setStatus(
+            `${medicine.name}を${nextValue ? "有効" : "無効"}にしました。`,
+            "success"
+          );
         });
 
         toggleLabel.append(toggle, slider);
@@ -268,7 +497,7 @@ if (medicineForm && medicineList && statusMessage) {
         return;
       }
 
-      setStatus(`${data.length}件の medicine を表示しています。`, "success");
+      setStatus("");
     };
 
     medicineForm.addEventListener("submit", async (event) => {
