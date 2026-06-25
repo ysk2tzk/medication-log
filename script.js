@@ -73,6 +73,101 @@ const formatConfirmationDateTime = (value = new Date()) =>
 const createMedicationLogRecord = async (supabaseClient, medicationId, recordedAt) => {
   const { data, error } = await supabaseClient.functions.invoke(
     googleCalendarFunctionName,
+
+const hasGoogleCalendarConfig = () =>
+  Boolean(googleClientId && googleAccountEmail && googleCalendarId);
+
+const createMedicationLogRecord = async (
+  supabaseClient,
+  medicationId,
+  googleCalendarEventId,
+  recordedAt
+) => {
+  const { error } = await supabaseClient
+    .from("medication_log")
+    .insert([{
+      medicine_id: medicationId,
+      google_calendar_event_id: googleCalendarEventId,
+      created_at: recordedAt,
+    }]);
+
+  return { error };
+};
+
+const getGoogleTokenClient = () => {
+  if (googleTokenClient || !window.google?.accounts?.oauth2 || !googleClientId) {
+    return googleTokenClient;
+  }
+
+  googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: googleClientId,
+    scope: GOOGLE_CALENDAR_SCOPE,
+    callback: () => {},
+  });
+
+  return googleTokenClient;
+};
+
+const requestGoogleAccessToken = () =>
+  new Promise((resolve, reject) => {
+    if (!hasGoogleCalendarConfig()) {
+      reject(new Error("config.js に Google カレンダー連携設定を追加してください。"));
+      return;
+    }
+
+    const tokenClient = getGoogleTokenClient();
+
+    if (!tokenClient) {
+      reject(new Error("Google 認証ライブラリの読み込みに失敗しました。"));
+      return;
+    }
+
+    tokenClient.callback = (response) => {
+      if (response.error) {
+        reject(new Error(response.error));
+        return;
+      }
+
+      googleAccessToken = response.access_token ?? "";
+      resolve(googleAccessToken);
+    };
+
+    tokenClient.requestAccessToken({
+      prompt: googleAccessToken ? "" : "consent",
+      login_hint: googleAccountEmail,
+    });
+  });
+
+const formatCalendarDateTime = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toISOString();
+};
+
+const floorDateToHalfHour = (value = new Date()) => {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date(NaN);
+  }
+
+  date.setSeconds(0, 0);
+  date.setMinutes(Math.floor(date.getMinutes() / 30) * 30);
+  return date;
+};
+
+const createGoogleCalendarEvent = async (medicineName, createdAt) => {
+  const accessToken = googleAccessToken || await requestGoogleAccessToken();
+  const startAt = new Date(createdAt);
+
+  if (Number.isNaN(startAt.getTime())) {
+    throw new Error("medication_log.created_at を日時として解釈できませんでした。");
+  }
+
+  const endAt = new Date(startAt.getTime() + 30 * 60 * 1000);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(googleCalendarId)}/events`,
     {
       body: {
         medicineId: medicationId,
@@ -142,7 +237,7 @@ if (homeMedicineList && homeStatusMessage) {
         button.className = "medicine-action-button";
         button.textContent = medicine.name;
         button.addEventListener("click", async () => {
-          const recordedAt = new Date();
+          const recordedAt = floorDateToHalfHour(new Date());
           const confirmationDateTime = formatConfirmationDateTime(recordedAt);
           const shouldRecord = window.confirm(
             `${medicine.name}の服薬を${confirmationDateTime}に記録します。よろしいですか？`
