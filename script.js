@@ -1,6 +1,17 @@
 const menuButton = document.querySelector(".menu-button");
 const menuPanel = document.querySelector(".menu-panel");
+const medicineForm = document.querySelector("[data-medicine-form]");
+const medicineList = document.querySelector("[data-medicine-list]");
+const statusMessage = document.querySelector("[data-status-message]");
+const homeMedicineList = document.querySelector("[data-home-medicine-list]");
+const homeStatusMessage = document.querySelector("[data-home-status-message]");
+
 const VALID_COLUMN_CANDIDATES = ["isValid", "is_valid"];
+const supabaseUrl = window.MEDICATION_LOG_SUPABASE_URL;
+const supabaseAnonKey = window.MEDICATION_LOG_SUPABASE_ANON_KEY;
+const googleCalendarFunctionName =
+  window.MEDICATION_LOG_GOOGLE_FUNCTION_NAME || "google-calendar-log";
+const createClient = window.supabase?.createClient;
 
 if (menuButton && menuPanel) {
   const closeMenu = () => {
@@ -34,25 +45,6 @@ if (menuButton && menuPanel) {
   });
 }
 
-const medicineForm = document.querySelector("[data-medicine-form]");
-const medicineList = document.querySelector("[data-medicine-list]");
-const statusMessage = document.querySelector("[data-status-message]");
-const homeMedicineList = document.querySelector("[data-home-medicine-list]");
-const homeStatusMessage = document.querySelector("[data-home-status-message]");
-
-const supabaseUrl = window.MEDICATION_LOG_SUPABASE_URL;
-const supabaseAnonKey = window.MEDICATION_LOG_SUPABASE_ANON_KEY;
-const googleCalendarFunctionName =
-  window.MEDICATION_LOG_GOOGLE_FUNCTION_NAME || "google-calendar-log";
-const createClient = window.supabase?.createClient;
-
-const getValidColumnName = (medicine = {}) =>
-  VALID_COLUMN_CANDIDATES.find((columnName) =>
-    Object.prototype.hasOwnProperty.call(medicine, columnName)
-  ) ?? "isValid";
-
-const getValidValue = (medicine = {}) => Boolean(medicine[getValidColumnName(medicine)]);
-
 const createSupabaseClient = () => {
   if (typeof createClient !== "function" || !supabaseUrl || !supabaseAnonKey) {
     return null;
@@ -60,6 +52,14 @@ const createSupabaseClient = () => {
 
   return createClient(supabaseUrl, supabaseAnonKey);
 };
+
+const getValidColumnName = (medicine = {}) =>
+  VALID_COLUMN_CANDIDATES.find((columnName) =>
+    Object.prototype.hasOwnProperty.call(medicine, columnName)
+  ) ?? "isValid";
+
+const getValidValue = (medicine = {}) =>
+  Boolean(medicine[getValidColumnName(medicine)]);
 
 const formatConfirmationDateTime = (value = new Date()) =>
   new Intl.DateTimeFormat("ja-JP", {
@@ -69,79 +69,6 @@ const formatConfirmationDateTime = (value = new Date()) =>
     hour: "2-digit",
     minute: "2-digit",
   }).format(value);
-
-const createMedicationLogRecord = async (supabaseClient, medicationId, recordedAt) => {
-  const { data, error } = await supabaseClient.functions.invoke(
-    googleCalendarFunctionName,
-
-const hasGoogleCalendarConfig = () =>
-  Boolean(googleClientId && googleAccountEmail && googleCalendarId);
-
-const createMedicationLogRecord = async (
-  supabaseClient,
-  medicationId,
-  googleCalendarEventId,
-  recordedAt
-) => {
-  const { error } = await supabaseClient
-    .from("medication_log")
-    .insert([{
-      medicine_id: medicationId,
-      google_calendar_event_id: googleCalendarEventId,
-      created_at: recordedAt,
-    }]);
-
-  return { error };
-};
-
-const getGoogleTokenClient = () => {
-  if (googleTokenClient || !window.google?.accounts?.oauth2 || !googleClientId) {
-    return googleTokenClient;
-  }
-
-  googleTokenClient = window.google.accounts.oauth2.initTokenClient({
-    client_id: googleClientId,
-    scope: GOOGLE_CALENDAR_SCOPE,
-    callback: () => {},
-  });
-
-  return googleTokenClient;
-};
-
-const requestGoogleAccessToken = () =>
-  new Promise((resolve, reject) => {
-    if (!hasGoogleCalendarConfig()) {
-      reject(new Error("config.js に Google カレンダー連携設定を追加してください。"));
-      return;
-    }
-
-    const tokenClient = getGoogleTokenClient();
-
-    if (!tokenClient) {
-      reject(new Error("Google 認証ライブラリの読み込みに失敗しました。"));
-      return;
-    }
-
-    tokenClient.callback = (response) => {
-      if (response.error) {
-        reject(new Error(response.error));
-        return;
-      }
-
-      googleAccessToken = response.access_token ?? "";
-      resolve(googleAccessToken);
-    };
-
-    tokenClient.requestAccessToken({
-      prompt: googleAccessToken ? "" : "consent",
-      login_hint: googleAccountEmail,
-    });
-  });
-
-const formatCalendarDateTime = (value) => {
-  const date = value instanceof Date ? value : new Date(value);
-  return date.toISOString();
-};
 
 const floorDateToHalfHour = (value = new Date()) => {
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
@@ -155,19 +82,9 @@ const floorDateToHalfHour = (value = new Date()) => {
   return date;
 };
 
-const createGoogleCalendarEvent = async (medicineName, createdAt) => {
-  const accessToken = googleAccessToken || await requestGoogleAccessToken();
-  const startAt = new Date(createdAt);
-
-  if (Number.isNaN(startAt.getTime())) {
-    throw new Error("medication_log.created_at を日時として解釈できませんでした。");
-  }
-
-  const endAt = new Date(startAt.getTime() + 30 * 60 * 1000);
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
-
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(googleCalendarId)}/events`,
+const createMedicationLogRecord = async (supabaseClient, medicationId, recordedAt) => {
+  const { data, error } = await supabaseClient.functions.invoke(
+    googleCalendarFunctionName,
     {
       body: {
         medicineId: medicationId,
@@ -204,7 +121,7 @@ if (homeMedicineList && homeStatusMessage) {
   };
 
   if (!supabaseClient) {
-    renderHomeEmptyState("medicineはまだ表示できません。");
+    renderHomeEmptyState("medicine はまだ表示できません。");
     setHomeStatus("config.js に Supabase URL と anon key を設定してください。", "error");
   } else {
     const loadHomeMedicines = async () => {
@@ -216,7 +133,7 @@ if (homeMedicineList && homeStatusMessage) {
         .order("id", { ascending: false });
 
       if (error) {
-        renderHomeEmptyState("medicineを読み込めませんでした。");
+        renderHomeEmptyState("medicine を読み込めませんでした。");
         setHomeStatus(`一覧取得に失敗しました: ${error.message}`, "error");
         return;
       }
@@ -258,18 +175,20 @@ if (homeMedicineList && homeStatusMessage) {
             );
           } catch (error) {
             button.disabled = false;
-            setHomeStatus("");
+            setHomeStatus("", "");
             window.alert(`登録に失敗しました: ${error.message}`);
             return;
           }
 
           button.disabled = false;
-          setHomeStatus("");
+          setHomeStatus("", "");
           window.alert(`${medicine.name}の服薬を記録し、Google カレンダーにも登録しました。`);
         });
+
         homeMedicineList.append(button);
       });
-      setHomeStatus("");
+
+      setHomeStatus("", "");
     };
 
     loadHomeMedicines();
@@ -278,6 +197,7 @@ if (homeMedicineList && homeStatusMessage) {
 
 if (medicineForm && medicineList && statusMessage) {
   const nameInput = medicineForm.elements.namedItem("name");
+  const supabaseClient = createSupabaseClient();
 
   const setStatus = (message, type = "") => {
     statusMessage.textContent = message;
@@ -298,16 +218,11 @@ if (medicineForm && medicineList && statusMessage) {
     medicineList.innerHTML = `<p class="empty-message">${message}</p>`;
   };
 
-  if (
-    !(nameInput instanceof HTMLInputElement) ||
-    !createSupabaseClient()
-  ) {
+  if (!(nameInput instanceof HTMLInputElement) || !supabaseClient) {
     setFormDisabled(true);
-    renderEmptyState("medicineはまだ表示できません。");
+    renderEmptyState("medicine はまだ表示できません。");
     setStatus("config.js に Supabase URL と anon key を設定してください。", "error");
   } else {
-    const supabaseClient = createSupabaseClient();
-
     const insertMedicine = async (name) => {
       const insertPayloads = [
         { name, isValid: true },
@@ -343,7 +258,7 @@ if (medicineForm && medicineList && statusMessage) {
 
     const renderMedicines = (medicines) => {
       if (!medicines.length) {
-        renderEmptyState("medicineはまだ登録されていません。");
+        renderEmptyState("medicine はまだ登録されていません。");
         return;
       }
 
@@ -407,12 +322,13 @@ if (medicineForm && medicineList && statusMessage) {
         .order("id", { ascending: false });
 
       if (error) {
-        renderEmptyState("medicineを読み込めませんでした。");
+        renderEmptyState("medicine を読み込めませんでした。");
         setStatus(`一覧取得に失敗しました: ${error.message}`, "error");
         return;
       }
 
       renderMedicines(data ?? []);
+
       if ((data ?? []).length === 0) {
         setStatus(
           "一覧が0件です。insert が成功している場合は Supabase の SELECT policy / RLS を確認してください。",
@@ -421,7 +337,7 @@ if (medicineForm && medicineList && statusMessage) {
         return;
       }
 
-      setStatus("");
+      setStatus("", "");
     };
 
     medicineForm.addEventListener("submit", async (event) => {
@@ -456,6 +372,7 @@ if (medicineForm && medicineList && statusMessage) {
 
       medicineForm.reset();
       nameInput.focus();
+
       if ((data ?? []).length === 0) {
         setStatus(
           "追加は成功しましたが、返却データがありません。RLS の設定を確認してください。",
@@ -464,6 +381,7 @@ if (medicineForm && medicineList && statusMessage) {
       } else {
         setStatus("medicine を追加しました。", "success");
       }
+
       await loadMedicines();
     });
 
