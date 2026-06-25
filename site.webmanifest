@@ -7,12 +7,12 @@
   "theme_color": "#f4efe2",
   "icons": [
     {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
+      "src": "icons/icon-medication.png",
+      "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "icons/icon-medication.png",
       "sizes": "512x512",
       "type": "image/png"
     }
